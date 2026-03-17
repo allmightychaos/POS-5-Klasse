@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Icons\image-add.png" />
+    <None Remove="Icons\image-delete.png" />
+    <None Remove="Icons\image-gallery.png" />
+    <None Remove="Icons\image-move.png" />
+    <None Remove="Icons\rotate-180.png" />
+    <None Remove="Icons\rotate-left.png" />
+    <None Remove="Icons\rotate-right.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Icons\image-add.png" />
+    <Resource Include="Icons\image-delete.png" />
+    <Resource Include="Icons\image-gallery.png" />
+    <Resource Include="Icons\image-move.png" />
+    <Resource Include="Icons\rotate-180.png" />
+    <Resource Include="Icons\rotate-left.png" />
+    <Resource Include="Icons\rotate-right.png" />
+  </ItemGroup>
+
+</Project>

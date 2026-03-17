@@ -1,0 +1,222 @@
+﻿<Window x:Class="SchiffeGUI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SchiffeGUI"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="900">
+    <Grid> <!-- Main Grid -->
+        <!-- RowDefs for MainGrid -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        
+        <!-- Header-Grid (Header, Dropdowns) -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            
+            <!-- Header-Text (0/0) -->
+            <TextBlock
+                Grid.Column="0"
+                Grid.Row="0"
+                Text="{Binding SpielStatus}"
+                FontSize="24"
+                FontWeight="Bold"
+                HorizontalAlignment="Center"
+                />
+
+            
+            <!-- Spielcontrols (0/1) -->
+            <Grid Grid.Column="0" Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- SchiffsAuswahl-->
+                <ComboBox 
+                    Grid.Column="0"
+                    ItemsSource="{Binding Flottenliste}"
+                    SelectedItem="{Binding AusgSchiff}"
+                    Height="30" 
+                    FontSize="16"
+                    Margin="3"
+                    >
+
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                <TextBlock Text=" (Noch: "/>
+                                <TextBlock Text="{Binding Anzahl}"/>
+                                <TextBlock Text=")"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+
+                </ComboBox>
+
+                <!-- OrientierungsAuswahl-->
+                <Button Grid.Column="1"
+                            Content="{Binding AusgOrientierung}"
+                            Command="{Binding DataContext.OrientierungGeklicktCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"
+                            Margin="3"
+                            />
+
+            </Grid>
+
+            
+            <!-- Netzwerk (1/2) -->
+            <Grid Grid.Column="1" Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Spiel hosten -->
+                <Button
+                    Grid.Column="0"
+                    Content="{Binding buttonHosting}"
+                    Command="{Binding HostWurdeGeklickt}"
+                    IsEnabled="{Binding istHost}"
+                    Margin="3"
+                    />
+
+                <!-- "oder..." -->
+                <TextBlock
+                    Grid.Column="1" 
+                    Text="oder..."
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Margin="3"
+                    />
+
+                <!-- IP-Input Feld -->
+                <!--
+                <TextBox
+                    Grid.Column="2"
+                    VerticalContentAlignment="Center"
+                    IsEnabled="{Binding istNetzwerkAuswahl}"
+                    Margin="3"
+                    />
+                -->
+                
+                <!-- Spiel beitreten -->
+                <Button
+                    Grid.Column="3"
+                    Content="{Binding buttonBeitreten}"
+                    Command="{Binding BeitretenWurdeGeklickt}"
+                    IsEnabled="{Binding istClient}"
+                    Margin="3"
+                    />
+            </Grid>
+            
+            
+            <!-- Neues Spiel (1/1) -->
+            <Button 
+                Grid.Column="1"
+                Grid.Row="1"
+                Content="Neues Spiel"
+                Command="{Binding DataContext.NeuesSpielGeklicktCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                Margin="3"
+                IsEnabled="{Binding isEnabled}"
+                />
+        </Grid>
+
+        
+        <!-- Spielefeld (Bottom) Grid -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <Rectangle Grid.Column="0"
+                       Grid.ColumnSpan="2"
+                       Width="2"
+                       Fill="Gray"
+                       VerticalAlignment="Stretch"
+                       HorizontalAlignment="Center"
+                       Panel.ZIndex="1"/>
+
+            <Rectangle Grid.Column="0"
+                       Grid.ColumnSpan="2"
+                       VerticalAlignment="Top"
+                       Fill="Gray"
+                       HorizontalAlignment="Stretch"
+                       Height="2"
+                       Panel.ZIndex="1"/>
+
+
+            <!-- Eigenes 10x10 Grid -->
+            <ItemsControl Grid.Column="0" ItemsSource="{Binding SpielfeldListe}" IsEnabled="{Binding }" Margin="20">
+
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="10" Columns="10"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Spielfeld Buttons -->
+                        <Button 
+                            Content="{Binding AnzeigeText}" 
+                            Command="{Binding DataContext.FeldGeklicktCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"
+                            Margin="2" 
+                            FontSize="18"
+                            IsEnabled="{Binding DataContext.IsConnected, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Foreground="{Binding TextFarbe}"
+                            Background="{Binding BackgFarbe}"
+                            />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+
+            </ItemsControl>
+
+
+            <!-- Gegner 10x10 Grid -->
+            <ItemsControl Grid.Column="1" ItemsSource="{Binding GegnerListe}" Margin="20">
+
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="10" Columns="10"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Spielfeld Buttons -->
+                        <Button Content="{Binding AnzeigeText}" 
+                                Command="{Binding DataContext.GegnerFeldGeklicktCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}"
+                                Margin="2" 
+                                FontSize="18"
+                                IsEnabled="{Binding DataContext.myTurn, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Foreground="{Binding TextFarbe}"
+                                Background="{Binding BackgFarbe}"
+                                />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+
+            </ItemsControl>
+
+
+        </Grid>
+        
+    </Grid>
+</Window>
