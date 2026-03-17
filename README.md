@@ -149,11 +149,11 @@ enthält immer die korrekten Werte zum Zeitpunkt des Speicherns.
 
 ---
 
-# Client-Server mit ORM, XML, WPF-Karte & Traveling Salesman – Referenz
+# Netzwerk-Anwendung mit Datenbank – Referenz
 
 ---
 
-## 1. ORM – SQLite mit Entity Framework Core
+## Entity Framework Core – SQLite
 
 ### NuGet-Pakete
 ```
@@ -161,83 +161,78 @@ Microsoft.EntityFrameworkCore
 Microsoft.EntityFrameworkCore.Sqlite
 ```
 
-### Model
+### Model & DbContext
 ```cs
-public class Stadt
+public class Produkt
 {
     public int Id { get; set; }
     public string Name { get; set; } = "";
-    public double Latitude { get; set; }
-    public double Longitude { get; set; }
+    public double X { get; set; }  // z.B. Position, Koordinate, Preis, ...
+    public double Y { get; set; }
 }
-```
 
-### DbContext
-```cs
 public class AppDbContext : DbContext
 {
-    public DbSet<Stadt> Staedte { get; set; }
+    public DbSet<Produkt> Produkte { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options.UseSqlite("Data Source=staedte.db");
+        => options.UseSqlite("Data Source=app.db");
 }
 ```
 
-### Datenbank laden
+### Daten laden
 ```cs
 using var ctx = new AppDbContext();
-var alle = ctx.Staedte.ToList();
+var alle = ctx.Produkte.ToList();
 ```
 
 ---
 
-## 2. Netzwerk – TCP Server & Client (XML, mehrere Clients)
+## TCP-Server (mehrere Clients gleichzeitig)
 
-### Server (Port 12345, mehrere Clients gleichzeitig)
 ```cs
-TcpListener listener = new TcpListener(IPAddress.Any, 12345);
+TcpListener listener = new TcpListener(IPAddress.Any, 5000);
 listener.Start();
 
 while (true)
 {
-    TcpClient client = await listener.AcceptTcpClientAsync();
-    _ = Task.Run(() => HandleClient(client)); // jeder Client bekommt eigenen Task
+    TcpClient tcpClient = await listener.AcceptTcpClientAsync();
+    _ = Task.Run(() => ClientVerarbeiten(tcpClient));
 }
 
-async Task HandleClient(TcpClient client)
+async Task ClientVerarbeiten(TcpClient tcpClient)
 {
-    using var stream = client.GetStream();
+    using var stream = tcpClient.GetStream();
     using var reader = new StreamReader(stream, Encoding.UTF8);
     using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
     string? zeile = await reader.ReadLineAsync();
     if (zeile == null) return;
 
-    // XML deserialisieren
     var anfrage = XmlHelper.Deserialize<Anfrage>(zeile);
-
-    // Antwort erstellen und als XML senden
-    var antwort = new Antwort { Ergebnis = "OK" };
+    // ... verarbeiten ...
+    var antwort = new Antwort();
     writer.WriteLine(XmlHelper.Serialize(antwort));
 }
 ```
 
-### Client (fix localhost:12345)
+## TCP-Client
+
 ```cs
-TcpClient client = new TcpClient("localhost", 12345);
+TcpClient client = new TcpClient("localhost", 5000);
 var stream = client.GetStream();
 var reader = new StreamReader(stream, Encoding.UTF8);
 var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
-// XML senden
 writer.WriteLine(XmlHelper.Serialize(anfrage));
-
-// Antwort empfangen
-string antwortXml = reader.ReadLine()!;
-var antwort = XmlHelper.Deserialize<Antwort>(antwortXml);
+string xml = reader.ReadLine()!;
+var antwort = XmlHelper.Deserialize<Antwort>(xml);
 ```
 
-### XML-Hilfsmethoden
+---
+
+## XML serialisieren / deserialisieren
+
 ```cs
 public static class XmlHelper
 {
@@ -257,255 +252,181 @@ public static class XmlHelper
 }
 ```
 
-### Transfer-Objekte (XML-serialisierbar)
+### Beispiel Transfer-Objekte
 ```cs
-[Serializable]
-public class Anfrage
-{
-    public string Suchbegriff { get; set; } = "";
-}
-
-[Serializable]
-public class Antwort
-{
-    public List<StadtDto> Staedte { get; set; } = new();
-}
-
-[Serializable]
-public class StadtDto
-{
-    public string Name { get; set; } = "";
-    public double Latitude { get; set; }
-    public double Longitude { get; set; }
-}
+[Serializable] public class Anfrage  { public string Filter { get; set; } = ""; }
+[Serializable] public class Antwort  { public List<EintragDto> Eintraege { get; set; } = new(); }
+[Serializable] public class EintragDto { public string Name { get; set; } = ""; public double X { get; set; } public double Y { get; set; } }
 ```
 
 ---
 
-## 3. GUI – WPF mit Weltkarte & Suchfeld
-
-### MainWindow.xaml (Grundstruktur)
-```xml
-<Window x:Class="Client.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Stadtsuche" Height="600" Width="900">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="200"/>
-        </Grid.ColumnDefinitions>
-
-        <!-- Suchleiste -->
-        <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.ColumnSpan="2" Margin="5">
-            <TextBox x:Name="SuchTextBox" Width="200" Margin="0,0,5,0"/>
-            <Button Content="Suchen" Click="Suchen_Click"/>
-        </StackPanel>
-
-        <!-- Weltkarte -->
-        <Canvas x:Name="WeltkarteCanvas" Grid.Row="1" Grid.Column="0" Background="LightBlue">
-            <Image Source="weltkarte.png" Stretch="Fill"
-                   Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Canvas}}"
-                   Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Canvas}}"/>
-        </Canvas>
-
-        <!-- Rechte Seite: ListBoxen -->
-        <StackPanel Grid.Row="1" Grid.Column="1" Margin="5">
-            <TextBlock Text="Suchergebnisse:"/>
-            <ListBox x:Name="ErgebnisListBox" Height="200" SelectionMode="Extended"
-                     DisplayMemberPath="Name"/>
-            <Button Content=">> Auswählen" Click="Auswaehlen_Click" Margin="0,5"/>
-            <TextBlock Text="Ausgewählte Städte:"/>
-            <ListBox x:Name="AuswahlListBox" Height="150" DisplayMemberPath="Name"/>
-            <Button Content="Route berechnen" Click="Route_Click" Margin="0,5"/>
-        </StackPanel>
-    </Grid>
-</Window>
-```
-
-### Suchen-Button: Suchbegriff an Server senden
-```cs
-private async void Suchen_Click(object sender, RoutedEventArgs e)
-{
-    string suchbegriff = SuchTextBox.Text.Trim();
-    if (string.IsNullOrEmpty(suchbegriff)) return;
-
-    var anfrage = new Anfrage { Suchbegriff = suchbegriff };
-    // XML senden (Netzwerk-Verbindung vorher herstellen, siehe oben)
-    _writer.WriteLine(XmlHelper.Serialize(anfrage));
-
-    string antwortXml = await Task.Run(() => _reader.ReadLine()!);
-    var antwort = XmlHelper.Deserialize<Antwort>(antwortXml);
-
-    // Karte aktualisieren + ListBox befüllen
-    ZeigeStaedteAufKarte(antwort.Staedte);
-    ErgebnisListBox.ItemsSource = antwort.Staedte;
-}
-```
-
----
-
-## 4. LINQ – Städte in der Datenbank suchen (Server)
+## LINQ – Filtern & Projizieren
 
 ```cs
-// Suche: Name enthält den Suchbegriff (Groß-/Kleinschreibung egal)
 using var ctx = new AppDbContext();
-string suche = anfrage.Suchbegriff.ToLower();
+string filter = anfrage.Filter.ToLower();
 
-List<StadtDto> treffer = ctx.Staedte
-    .Where(s => s.Name.ToLower().Contains(suche))
-    .Select(s => new StadtDto
-    {
-        Name      = s.Name,
-        Latitude  = s.Latitude,
-        Longitude = s.Longitude
-    })
+var treffer = ctx.Produkte
+    .Where(p => p.Name.ToLower().Contains(filter))
+    .Select(p => new EintragDto { Name = p.Name, X = p.X, Y = p.Y })
     .ToList();
 ```
 
----
-
-## 5. Städte auf der Weltkarte anzeigen
+Weitere nützliche LINQ-Operationen:
 
 ```cs
-private void ZeigeStaedteAufKarte(List<StadtDto> staedte)
+.OrderBy(p => p.Name)          // sortieren
+.OrderByDescending(p => p.X)
+.First()                       // erstes Element
+.FirstOrDefault()              // erstes oder null
+.Count()                       // Anzahl
+.Sum(p => p.X)                 // Summe
+.Any(p => p.Name == "Test")    // existiert?
+```
+
+---
+
+## WPF – Canvas mit Bild & Punkte zeichnen
+
+### XAML
+```xml
+<Grid>
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="220"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- Canvas mit Hintergrundbild -->
+    <Canvas x:Name="HauptCanvas" Grid.Column="0" Background="LightBlue">
+        <Image Source="hintergrund.png" Stretch="Fill"
+               Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Canvas}}"
+               Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Canvas}}"/>
+    </Canvas>
+
+    <!-- Seitenleiste -->
+    <StackPanel Grid.Column="1" Margin="5">
+        <TextBox x:Name="FilterTextBox" Margin="0,0,0,5"/>
+        <Button Content="Suchen" Click="Suchen_Click" Margin="0,0,0,10"/>
+        <ListBox x:Name="ErgebnisListBox" Height="180" SelectionMode="Extended"
+                 DisplayMemberPath="Name"/>
+        <Button Content="Hinzufügen" Click="Hinzufuegen_Click" Margin="0,5"/>
+        <ListBox x:Name="AuswahlListBox" Height="130" DisplayMemberPath="Name"/>
+        <Button Content="Auswertung" Click="Auswertung_Click" Margin="0,5"/>
+    </StackPanel>
+</Grid>
+```
+
+### Punkte auf Canvas setzen (X/Y als Koordinaten)
+```cs
+void ZeigePunkteAufCanvas(List<EintragDto> eintraege)
 {
-    // Alte Marker entfernen (nur Ellipsen, nicht das Bild)
-    var zuEntfernen = WeltkarteCanvas.Children.OfType<Ellipse>().ToList();
-    foreach (var el in zuEntfernen)
-        WeltkarteCanvas.Children.Remove(el);
+    // Nur Ellipsen entfernen, nicht das Hintergrundbild
+    foreach (var el in HauptCanvas.Children.OfType<Ellipse>().ToList())
+        HauptCanvas.Children.Remove(el);
 
-    double breite = WeltkarteCanvas.ActualWidth;
-    double hoehe  = WeltkarteCanvas.ActualHeight;
+    double w = HauptCanvas.ActualWidth;
+    double h = HauptCanvas.ActualHeight;
 
-    foreach (var stadt in staedte)
+    foreach (var e in eintraege)
     {
-        // Koordinaten auf Canvas umrechnen
-        double x = (stadt.Longitude + 180) / 360 * breite;
-        double y = (90 - stadt.Latitude)  / 180 * hoehe;
+        // Beispiel: X/Y sind Längen-/Breitengrad → auf Canvas umrechnen
+        double cx = (e.X + 180) / 360 * w;
+        double cy = (90 - e.Y)  / 180 * h;
 
-        var punkt = new Ellipse
-        {
-            Width  = 8,
-            Height = 8,
-            Fill   = Brushes.Red,
-            ToolTip = stadt.Name
-        };
-        Canvas.SetLeft(punkt, x - 4);
-        Canvas.SetTop(punkt,  y - 4);
-        WeltkarteCanvas.Children.Add(punkt);
+        var kreis = new Ellipse { Width = 8, Height = 8, Fill = Brushes.Red, ToolTip = e.Name };
+        Canvas.SetLeft(kreis, cx - 4);
+        Canvas.SetTop(kreis,  cy - 4);
+        HauptCanvas.Children.Add(kreis);
     }
 }
 ```
 
 ---
 
-## 6. Städte auswählen (ListBox → zweite ListBox)
+## ListBox – Mehrfachauswahl in zweite ListBox übertragen
 
 ```cs
-private void Auswaehlen_Click(object sender, RoutedEventArgs e)
+private void Hinzufuegen_Click(object sender, RoutedEventArgs e)
 {
-    foreach (StadtDto stadt in ErgebnisListBox.SelectedItems)
-    {
-        // Nur hinzufügen wenn noch nicht enthalten
-        var liste = (AuswahlListBox.ItemsSource as List<StadtDto>) ?? new List<StadtDto>();
-        if (!liste.Any(s => s.Name == stadt.Name))
-            liste.Add(stadt);
-        AuswahlListBox.ItemsSource = null;
-        AuswahlListBox.ItemsSource = liste;
-    }
+    var liste = (AuswahlListBox.ItemsSource as List<EintragDto>) ?? new List<EintragDto>();
+
+    foreach (EintragDto item in ErgebnisListBox.SelectedItems)
+        if (!liste.Any(x => x.Name == item.Name))
+            liste.Add(item);
+
+    AuswahlListBox.ItemsSource = null;
+    AuswahlListBox.ItemsSource = liste;
+    // ErgebnisListBox bleibt unverändert
 }
 ```
 
-> **Wichtig:** `AuswahlListBox` wird bei einer neuen Suche **nicht** zurückgesetzt –
-> nur `ErgebnisListBox` bekommt neue Daten.
+> Die zweite ListBox (`AuswahlListBox`) wird beim nächsten Suchen **nicht** geleert –
+> sie akkumuliert die Auswahl über mehrere Suchen hinweg.
 
 ---
 
-## 7. Traveling Salesman – kürzeste Route (Nearest Neighbor)
+## Graphen / Routenoptimierung – Nearest Neighbor (Greedy TSP)
+
+Findet eine kurze (nicht unbedingt optimale) Rundroute durch alle Punkte.
 
 ```cs
-private void Route_Click(object sender, RoutedEventArgs e)
+List<EintragDto> NearestNeighbor(List<EintragDto> punkte)
 {
-    var staedte = (AuswahlListBox.ItemsSource as List<StadtDto>)?.ToList();
-    if (staedte == null || staedte.Count < 2) return;
+    var offen = punkte.ToList();
+    var route = new List<EintragDto> { offen[0] };
+    offen.RemoveAt(0);
 
-    var route = NearestNeighbor(staedte);
-    ZeigeRouteAufKarte(route);
-}
-
-// Nearest-Neighbor-Heuristik
-List<StadtDto> NearestNeighbor(List<StadtDto> staedte)
-{
-    var verbleibend = staedte.ToList();
-    var route = new List<StadtDto> { verbleibend[0] };
-    verbleibend.RemoveAt(0);
-
-    while (verbleibend.Count > 0)
+    while (offen.Count > 0)
     {
-        var letzter = route.Last();
-        var naechster = verbleibend
-            .OrderBy(s => Distanz(letzter, s))
-            .First();
+        var letzter   = route.Last();
+        var naechster = offen.MinBy(p => Distanz(letzter, p))!;
         route.Add(naechster);
-        verbleibend.Remove(naechster);
+        offen.Remove(naechster);
     }
     return route;
 }
 
-// Euklidische Distanz auf Basis von Lat/Lon
-double Distanz(StadtDto a, StadtDto b)
+double Distanz(EintragDto a, EintragDto b)
 {
-    double dx = a.Longitude - b.Longitude;
-    double dy = a.Latitude  - b.Latitude;
+    double dx = a.X - b.X, dy = a.Y - b.Y;
     return Math.Sqrt(dx * dx + dy * dy);
 }
+```
 
-// Route als Linien auf Canvas zeichnen
-void ZeigeRouteAufKarte(List<StadtDto> route)
+### Route als Linien zeichnen
+```cs
+void ZeigeRoute(List<EintragDto> route)
 {
-    // Alte Linien entfernen
-    var linien = WeltkarteCanvas.Children.OfType<Line>().ToList();
-    foreach (var l in linien) WeltkarteCanvas.Children.Remove(l);
+    foreach (var l in HauptCanvas.Children.OfType<Line>().ToList())
+        HauptCanvas.Children.Remove(l);
 
-    double breite = WeltkarteCanvas.ActualWidth;
-    double hoehe  = WeltkarteCanvas.ActualHeight;
+    double w = HauptCanvas.ActualWidth, h = HauptCanvas.ActualHeight;
 
     for (int i = 0; i < route.Count - 1; i++)
     {
-        var von = route[i];
-        var bis = route[i + 1];
-
-        var linie = new Line
+        var a = route[i]; var b = route[i + 1];
+        HauptCanvas.Children.Add(new Line
         {
-            X1 = (von.Longitude + 180) / 360 * breite,
-            Y1 = (90 - von.Latitude)   / 180 * hoehe,
-            X2 = (bis.Longitude + 180) / 360 * breite,
-            Y2 = (90 - bis.Latitude)   / 180 * hoehe,
-            Stroke          = Brushes.DarkBlue,
-            StrokeThickness = 2
-        };
-        WeltkarteCanvas.Children.Add(linie);
+            X1 = (a.X + 180) / 360 * w,  Y1 = (90 - a.Y) / 180 * h,
+            X2 = (b.X + 180) / 360 * w,  Y2 = (90 - b.Y) / 180 * h,
+            Stroke = Brushes.DarkBlue, StrokeThickness = 2
+        });
     }
 }
 ```
 
 ---
 
-## Schnellübersicht
+## Kurzübersicht
 
-| Thema | Wichtigste Klassen / Methoden |
+| Was | Wie |
 |---|---|
-| ORM | `DbContext`, `DbSet<T>`, `UseSqlite(...)`, `.ToList()` |
-| Server | `TcpListener`, `AcceptTcpClientAsync`, `Task.Run(HandleClient)` |
-| Client | `TcpClient("localhost", 12345)`, `StreamReader/Writer` |
-| XML | `XmlSerializer`, `Serialize<T>`, `Deserialize<T>` |
-| LINQ | `.Where(...)`, `.Select(...)`, `.Contains(...)`, `.ToList()` |
-| Karte | `Canvas`, `Ellipse`, `Canvas.SetLeft/Top`, Koordinaten umrechnen |
-| ListBox | `ItemsSource`, `SelectedItems`, `SelectionMode="Extended"` |
-| TSP | Nearest Neighbor: immer zur nächsten unbesuchten Stadt |
+| SQLite laden | `UseSqlite(...)`, `ctx.Tabelle.ToList()` |
+| Mehrere Clients | `Task.Run(() => ClientVerarbeiten(client))` |
+| XML senden | `writer.WriteLine(XmlHelper.Serialize(obj))` |
+| XML empfangen | `XmlHelper.Deserialize<T>(reader.ReadLine()!)` |
+| LINQ filtern | `.Where(x => x.Name.ToLower().Contains(filter))` |
+| Canvas Punkt | `new Ellipse()`, `Canvas.SetLeft/Top` |
+| Mehrfachauswahl | `SelectionMode="Extended"`, `SelectedItems` |
+| Nearest Neighbor | MinBy(Distanz) in Schleife bis alle besucht |
